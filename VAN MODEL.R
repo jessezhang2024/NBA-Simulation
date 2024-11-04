@@ -1,5 +1,5 @@
-#Update 9.24 whole code.
-#when VAN model
+
+#VAN model
 library(readxl)
 library(readr)
 library(stats)
@@ -514,7 +514,7 @@ BT_plots = function(model){
     for (i in 1:nrow(model$Table)){
       table$home[i] <- model$Table[i,] + model$Alpha[i,]
     }
-    table$midpoint <- (table$Theta + table$home) / 2  # 计算 Theta 和 home 的平均值
+    table$midpoint <- (table$Theta + table$home) / 2  
     Teams = model$Teams
     #Theta = table[order(-table$Theta),]
     Theta = table[order(-table$midpoint),]
@@ -626,9 +626,9 @@ BT_predict = function(model, df, R = NULL){
 # Past years model
 
 rawdata <- read_excel("NBA Data 2018-19 to 2022-23.xlsx")
-formaldata<-DesiredFormatNBA(rawdata)#提取原始数据中的主要分析变量
-matdata<-Data2Mat(formaldata)#继续转化主要分析变量为一些矩阵
-fixtures= formaldata#fixture是只有几列的数据集
+formaldata<-DesiredFormatNBA(rawdata)
+matdata<-Data2Mat(formaldata)
+fixtures= formaldata#
 NBA_R = function(fixtures){
   data = fixtures
   Teams = unique(fixtures$Team.B)
@@ -696,7 +696,7 @@ NBA_R = function(fixtures){
   R = C + D + L
   return(R)
 }
-R <- NBA_R(fixtures)#表示队伍之间的胜负关系矩阵
+R <- NBA_R(fixtures)
 VAN = BT_Model(matdata,'VAN',R=R)
 Teams <-VAN$Teams
 
@@ -708,11 +708,7 @@ rawdatanew <- read_excel("2023-2024 regular.xlsx")
 formaldatanew<-DesiredFormatNBA(rawdatanew)
 matdatanew<-Data2Mat(formaldatanew)
 VAN_2024 = BT_Model(matdatanew,'VAN',R=R)
-
-plot<- BT_plots(VAN_2024)
-
-# 4
-
+modelplot<-BT_plots(VAN_2024)
 # 4
 # Simulation for new seasons playin
 
@@ -804,8 +800,8 @@ playin2024 <- as.data.frame(playin2024)
 ProbabilitiesVAN <- BT_predict(VAN_2024, formaldatanew, R)
 
 Seedsrun <- function() {
-  Seeds <<- PlayInTournament(VAN_2024, playin2024, R)  # 更新全局变量 Seeds
-  Seeds <<- as.data.frame(Seeds)  # 这里也用 <<- 确保更新全局变量
+  Seeds <<- PlayInTournament(VAN_2024, playin2024, R)  
+  Seeds <<- as.data.frame(Seeds)  
   return(Seeds)
 }
 Seeds<-Seedsrun()
@@ -933,9 +929,6 @@ Simulation_Playoff_West = function(df, SW, Probabilities){
   p$Winner <- NA
   p$TeamA_home_win_prob <-NA
   p$TeamA_away_win_prob <-NA
-  # 查看 p 中的队伍名称
-  #print(unique(p$Team.A))
-  #print(unique(p$Team.B))
   for (i in 1:nrow(p)){
     p$TeamA_home_win_prob[i] <- Probabilities$Team_B_win[Probabilities$Team.A == p[i,2] & Probabilities$Team.B == p[i,1]][1]
     p$TeamA_away_win_prob[i] <- Probabilities$Team_A_win[Probabilities$Team.A == p[i,1] & Probabilities$Team.B == p[i,2]][1]
@@ -1014,7 +1007,6 @@ West <- function() {
 #7 
 # Final
 # This seeds only include 21 teams of season, if for new data, should change it as automaticly get all rankings of new season
-# This seeds only include 21 teams of season, if for new data, should change it as automaticly get all rankings of new season
 Seeds_Tournament = function(){
   # Seeds of the entire league with an example of the 2022-23 season
   #https://www.espn.com/nba/standings/_/season/2023/group/league
@@ -1031,7 +1023,6 @@ Seeds_Tournament = function(){
 ST<-Seeds_Tournament()
 Final = function(ST){
   
-  # 使用 EastResult 和 WestResult 进行后续操作
   Finalteam <- data.frame(matrix(ncol = 2))
   colnames(Finalteam) <- c("Team.A", "Team.B")
   Finalteam[,1] <- EastResult$Winner[7]
@@ -1045,7 +1036,6 @@ Final = function(ST){
   
 }
 #Finalteam<- Final(ST)
-
 
 Simulation_Final = function(df, Probabilities){
   # df is the output from the function Final(), which adjusts the seeding to obtain the extra home court game
@@ -1078,56 +1068,35 @@ Finalgame2 = function(){
 
 NBAPLAYOFFS <- function() {
   # Combine all the functions to obtain results of the simulations
-  Seeds <- PlayInTournament(VAN_2024, playin2024, R = R)  # Use play-in data
+  Seeds <- PlayInTournament(VAN_2024, playin2024, R = R)  
   Seedsofeast <- Seeds_East(Seeds)
-  EastResult <- East()  # Run the East playoffs
+  EastResult <- East()  
   Seedsofwest <- Seeds_West(Seeds)
-  WestResult <- West()  # Run the West playoffs
+  WestResult <- West()  
   ST <- Seeds_Tournament()
-  Finalteam <- Final(ST)  # Get the final teams
-  Championship <- Finalgame2()  # Run the simulation for the championship
-  
-  # Prepare output
+  Finalteam <- Final(ST) 
+  Championship <- Finalgame2()  
   Output <- data.frame(EastResult)
   colnames(Output) <- c("Team.A", "Team.B", "Home_Win", "Winner", "TeamA_home_win_prob", "TeamA_away_win_prob")
-  Output[8:14, ] <- WestResult  # Add West results to output
-  Output[15, ] <- Championship  # Add Championship result
+  Output[8:14, ] <- WestResult  
+  Output[15, ] <- Championship  
   
-  return(Output)  # Return only the Championship result
+  return(Output)  
 }
 
 NBA <- function() {
   # Combine all the functions to obtain results of the simulations
-  Seeds <- PlayInTournament(VAN_2024, playin2024, R = R)  # Use play-in data
+  Seeds <- PlayInTournament(VAN_2024, playin2024, R = R)  
   Seedsofeast <- Seeds_East(Seeds)
-  EastResult <- East()  # Run the East playoffs
+  EastResult <- East()  
   Seedsofwest <- Seeds_West(Seeds)
-  WestResult <- West()  # Run the West playoffs
+  WestResult <- West() 
   ST <- Seeds_Tournament()
-  Finalteam <- Final(ST)  # Get the final teams
-  Championship <- Finalgame2()  # Run the simulation for the championship
-  
-  # Prepare output
+  Finalteam <- Final(ST)  
+  Championship <- Finalgame2()  
   Output <- data.frame(EastResult)
   colnames(Output) <- c("Team.A", "Team.B", "Home_Win", "Winner", "TeamA_home_win_prob", "TeamA_away_win_prob")
-  Output[8:14, ] <- WestResult  # Add West results to output
-  Output[15, ] <- Championship  # Add Championship result
-  
-  return(Championship$Winner)  # Return only the Championship result
+  Output[8:14, ] <- WestResult  
+  Output[15, ] <- Championship  
+  return(Championship$Winner)  
 }
-
-
-
-#10 
-# output
-
-#print(CHI_2024)
-modelplot<-BT_plots(VAN_2024)
-#Seeds
-#East
-#West
-#Finalgame
-#RUNONCE
-#Champion
-#plot_simulations
-
