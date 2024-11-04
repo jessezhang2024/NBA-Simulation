@@ -1,5 +1,4 @@
-
-#VAN model
+#when CHA model
 library(readxl)
 library(readr)
 library(stats)
@@ -11,15 +10,15 @@ DesiredFormatNBA = function(df){
   # Convert the NBA Data as shown in image to n x 6 matrix where the columns are mentioned like below.
   BT <- data.frame(matrix(ncol=6,nrow=nrow(df), dimnames=list(NULL, c("Team A", "Team B", "Team A win", "Team B win", "Team A home", "Team B home"))))
   my_range <- 1:nrow(df)
-  for(i in my_range){
+  for(i in my_range){  
     BT[i,1] <- df[i,3]
     BT[i,2] <- df[i,5]
   }
-
+  
   for (i in my_range){
     BT[i,3] <- ifelse(df[i,4] > df[i,6], 1, 0)
     BT[i,4] <- ifelse(df[i,6] > df[i,4], 1, 0)
-
+    
     BT[i,5] <- ifelse(BT[i,1] == df[i,5], 1, 0)
     BT[i,6] <- ifelse(BT[i,2] == df[i,5], 1, 0)
   }
@@ -30,26 +29,26 @@ Data2Mat = function(df){
   # Data frame should have the columns 'Team.A', 'Team.B', 'Team.A.win', 'Team.B.win', 'Team.A.Home', 'Team.B.Home', as the desired format
   # This function then returns the h, w, nw, l and nl matrices required for our BT package.
   # In the NBA data, Team B was always the home team. Hence, essentially, 'Team.A.Home' is a column of 0s.
-
+  
   Teams = unique(df$Team.B)
-
+  
   df[,3] = as.numeric(df[,3])
   df[,4] = as.numeric(df[,4])
   df[,6] = as.numeric(df[,6])
-
+  
   w = matrix(data = 0, nrow = length(Teams), ncol = length(Teams), dimnames = list(Teams, Teams))
   l = matrix(data = 0, nrow = length(Teams), ncol = length(Teams), dimnames = list(Teams, Teams))
-
+  
   nw = matrix(data = 0, nrow = length(Teams), ncol = length(Teams), dimnames = list(Teams, Teams))
   nl = matrix(data = 0, nrow = length(Teams), ncol = length(Teams), dimnames = list(Teams, Teams))
-
+  
   for(i in 1:nrow(df)){
     if (df[i,6] == 1){
       row = df[i,]
-      w[row$Team.B, row$Team.A] = w[row$Team.B, row$Team.A] + (row$Team.B.win == 1)
-      l[row$Team.B, row$Team.A] = l[row$Team.B, row$Team.A] + (row$Team.A.win == 1)
+      w[row$Team.B, row$Team.A] = w[row$Team.B, row$Team.A] + (row$Team.B.win == 1) 
+      l[row$Team.B, row$Team.A] = l[row$Team.B, row$Team.A] + (row$Team.A.win == 1) 
     }
-  }
+  }  
   for(i in 1:nrow(df)){
     if (df[i,6] == 0){
       row = df[i,]
@@ -58,8 +57,8 @@ Data2Mat = function(df){
       nl[row$Team.A, row$Team.B]  = nl[row$Team.A, row$Team.B] + (row$Team.B.win == 1)
       nl[row$Team.B, row$Team.A]  = nl[row$Team.B, row$Team.A] + (row$Team.A.win == 1)
     }
-  }
-
+  }  
+  
   h = w + l
   return(list(h=h, w=w, l=l, nw = nw, nl = nl, Teams = Teams))
 }
@@ -76,23 +75,23 @@ ntheta = function(mat, model_number, R = NULL){
 NBA_R = function(fixtures){
   data = fixtures
   Teams = unique(fixtures$Team.B)
-
+  
   Atlantic = c('Boston Celtics', 'Brooklyn Nets', 'New York Knicks', 'Philadelphia 76ers', 'Toronto Raptors')
   Central = c('Chicago Bulls', 'Cleveland Cavaliers', 'Detroit Pistons', 'Indiana Pacers', 'Milwaukee Bucks')
   Southeast = c('Atlanta Hawks', 'Charlotte Hornets', 'Miami Heat', 'Orlando Magic', 'Washington Wizards')
   Northwest = c('Denver Nuggets', 'Minnesota Timberwolves', 'Oklahoma City Thunder', 'Portland Trail Blazers', 'Utah Jazz')
   Pacific = c('Golden State Warriors', 'Los Angeles Clippers', 'Los Angeles Lakers', 'Phoenix Suns','Sacramento Kings')
   Southwest = c('Dallas Mavericks', 'Houston Rockets','Memphis Grizzlies','New Orleans Pelicans','San Antonio Spurs')
-
+  
   D = matrix(data = 0, nrow = length(Teams), ncol = length(Teams), dimnames = list(Teams, Teams))
   C = matrix(data = 0, nrow = length(Teams), ncol = length(Teams), dimnames = list(Teams, Teams))
   L = matrix(data = 0, nrow = length(Teams), ncol = length(Teams), dimnames = list(Teams, Teams))
   R = matrix(data = 0, nrow = length(Teams), ncol = length(Teams), dimnames = list(Teams, Teams))
-
+  
   East = data.frame(Atlantic, Southeast, Central)
   West = data.frame(Southwest, Pacific, Northwest)
   NBA = data.frame(East, West)
-
+  
   # Basic designation of relationship
   for(i in Teams){
     for(j in Teams){
@@ -101,7 +100,7 @@ NBA_R = function(fixtures){
       }
     }
   }
-
+  
   # Designating Conferences
   for(con1 in 1:ncol(East)){
     for(con2 in 1:ncol(East)){
@@ -114,19 +113,19 @@ NBA_R = function(fixtures){
       }
     }
   }
-
+  
   for(con1 in 1:ncol(West)){
     for(con2 in 1:ncol(West)){
       for(i in 1:nrow(West[con1])){
         for(j in 1:nrow(West[con2])){
           if(West[i, con1] != West[j, con2]){
             C[West[i, con1], West[j, con2]] = 1
-          }
+          }  
         }
       }
     }
   }
-
+  
   # Designating Divisions
   for(div in 1:ncol(NBA)){
     for(i in 1:nrow(NBA[div])){
@@ -136,38 +135,60 @@ NBA_R = function(fixtures){
       }
     }
   }
-
+  
   R = C + D + L
   return(R)
 }
 
 #R <- NBA_R(fixtures)
 
-Log_Like1 = function(theta, mat){
+# Defining a log-likelihood function - Common Homeground model
+Log_Like2 = function(theta, mat){
   # mat contains mat$h, mat$w, mat$l, mat$nw, mat$nl
   # theta is the vector of thetas (skill levels)
   Teams = colnames(mat$h)
-
-  log_like1 = 0
-
-  for(i in 1:length(Teams)){
-    for(j in 1:length(Teams)){
-      log_like1 = log_like1 + (mat$w[i, j] + mat$l[j, i] + mat$nw[i, j])*(theta[i] - log(exp(theta[i]) + exp(theta[j])))
+  number = length(Teams)
+  
+  log_like2 = 0 
+  
+  for(i in 1:number){
+    for(j in 1:number){
+      log_like2 = log_like2 + 
+        mat$w[i,j]*(theta[i] + theta[1+number] - log(exp(theta[i] + theta[1+number]) + exp(theta[j]))) +
+        mat$l[j,i]*(theta[i] - log(exp(theta[i]) + exp(theta[1+number] + theta[j]))) +
+        mat$nw[i,j]*(theta[i] - log(exp(theta[i])+exp(theta[j])))
     }
   }
-  return(-log_like1)
+  return(-1*log_like2)
 }
 
-# Defining a gradient for the likelihood function
-Log_Like_deriv1 = function(theta, mat){
+# Defining a gradient for the likelihood function - Common Homeground
+Log_Like_deriv2 = function(theta, mat){
   Teams = colnames(mat$h)
-  output = rep(0,ntheta(mat, 1, R))
-  for(i in 1:length(Teams)){
-    log_like_deriv1 = 0
-    for(j in 1:length(Teams)){
-      log_like_deriv1 = log_like_deriv1 - (mat$h[i,j] + mat$h[j,i] + mat$nw[i,j] + mat$nw[j,i])*((exp(theta[i]))/(exp(theta[i]) + exp(theta[j])))
+  number = length(Teams)
+  output = rep(0,ntheta(mat, 2, R))
+  
+  # dL/dtheta
+  for(i in 1:number){
+    log_like_deriv2 = 0
+    for(j in 1:number){
+      log_like_deriv2 = log_like_deriv2 - 
+        (mat$h[i,j])*((exp(theta[i] + theta[1+number]))/(exp(theta[i] + theta[1+number]) + exp(theta[j]))) -
+        (mat$h[j,i])*((exp(theta[i]))/(exp(theta[j] + theta[1+number]) + exp(theta[i]))) -
+        (mat$nw[i,j])*(exp(theta[i]))/(exp(theta[i]) + exp(theta[j])) - 
+        (mat$nw[j,i])*(exp(theta[i]))/(exp(theta[i]) + exp(theta[j]))
     }
-    output[i] = sum(mat$w[i,]) + sum(mat$l[,i]) + sum(mat$nw[i,]) + log_like_deriv1
+    output[i] = sum(mat$w[i,]) + sum(mat$l[,i]) + sum(mat$nw[i,]) + log_like_deriv2
+  }
+  
+  # dL/dAlpha
+  output[number + 1] = 0
+  for(i in 1:number){
+    alpha = 0
+    for(j in 1:number){
+      alpha = alpha - ((mat$h[i,j])*(exp(theta[i] + theta[1+number]))/(exp(theta[i] + theta[1+number]) + exp(theta[j])))  
+    }
+    output[number + 1] = output[number + 1] + sum(mat$w[i,]) + alpha
   }
   return(-1*output)
 }
@@ -205,74 +226,74 @@ BT_Model = function(matrix, Model_type, R = NULL){
   # Returns the 'thetas' with the least parameter set to 0 for the specified Bradley-Terry model
   # The model type has to be specified in this manner
   # VAN - Vanilla, CHA - Common Homeground advantage, CHI - Common Hierarchical Model, TSH - Team Specific Homeground,
-  # HIE - Hierarchical, PAI - Pairwise Homeground
-
+  # HIE - Hierarchical, PAI - Pairwise Homeground 
+  
   teams = matrix$Teams
-
+  
   if(Model_type == 'VAN'){
     theta = rep(0, ntheta(matrix, 1)) # Optimization starting from 0
     Model = optim(par = theta, fn = Log_Like1, gr = Log_Like_deriv1, mat = matrix, method = 'BFGS') # Fitting Model
     least = teams[which.min(Model$par)]
     best = teams[which.max(Model$par)]
-
+    
     Theta = Model$par - Model$par[which(teams == least)] # Re-basing so that the least ranked team has theta = 0
     Table = data.frame(teams, Theta)
     return(list(Table = Table, type = Model_type, Worst = least, Teams = teams))
   }
-
+  
   if(Model_type == 'CHA'){
     theta = rep(0,ntheta(matrix, 2))
     Model = optim(par = theta, fn = Log_Like2, gr = Log_Like_deriv2, mat = matrix, method = 'BFGS')
-
+    
     least = teams[which.min(Model$par[1:length(teams)])]
     best = teams[which.max(Model$par[1:length(teams)])]
-
+    
     theta = Model$par[1:length(teams)] - Model$par[which(teams == least)]
     alpha = Model$par[(1+length(teams))]
-
+    
     Table = data.frame(teams, Theta = theta)
     return(list(Table = Table, Alpha = alpha, type = Model_type, Worst = least, Best = best, Teams = teams))
   }
-
+  
   if(Model_type == 'CHI'){
     advantages = c("Level 1", "Level 2", "Level 3")
     theta = rep(0, ntheta(matrix, 3, R))
     Model = optim(par = theta, fn = Log_Like3, gr = Log_Like_deriv3, mat = matrix, R = R, method = 'BFGS')
-
+    
     least = teams[which.min(Model$par[1:length(teams)])]
     bigger_advantage = advantages[which.max(Model$par[(length(teams) + 1):(length(teams) + max(R))])]
-
+    
     theta = Model$par[1:length(teams)] - Model$par[which(teams == least)]
     alpha = Model$par[(length(teams) + 1):(length(teams) + max(R))]
-
+    
     Table = (data.frame(Theta = theta, row.names = teams))
     Alpha = data.frame(Alpha = alpha, row.names = 1:max(R))
-
+    
     return(list(Table = Table, Alpha = Alpha, type = Model_type, Advantage = bigger_advantage, Teams = teams))
   }
-
+  
   if(Model_type == 'TSH'){
     theta = rep(0,ntheta(matrix, 4))
     Model = optim(par = theta, fn = Log_Like4, gr = Log_Like_deriv4, mat = matrix, method = 'BFGS')
-
+    
     least = teams[which.min(Model$par[1:length(teams)])]
     bigger_advantage = teams[which.max(Model$par[(length(teams) + 1):(2*length(teams))])]
-
+    
     theta = Model$par[1:length(teams)] - Model$par[which(teams == least)]
     alpha = Model$par[(length(teams) + 1):(2*length(teams))]
-
+    
     Table = data.frame(Theta = theta, row.names = teams)
     Alpha = data.frame(Alpha = alpha, row.names = teams)
-
+    
     return(list(Table = Table, Alpha = Alpha, type = Model_type, Highest_Home_Advantage = bigger_advantage, Teams = teams))
   }
-
+  
   if(Model_type == 'HIE'){
     theta = rep(0,ntheta(matrix, 5, R))
     Model = optim(par = theta, fn = Log_Like5, gr = Log_Like_deriv5, mat = matrix, R = R, method = 'BFGS')
-
+    
     least = teams[which.min(Model$par[1:length(teams)])]
-
+    
     theta = Model$par[1:length(teams)] - Model$par[which(teams == least)]
     Table = data.frame(theta, row.names = teams)
     Alpha = NA
@@ -282,20 +303,20 @@ BT_Model = function(matrix, Model_type, R = NULL){
       Alpha = data.frame(Alpha, Level, row.names = teams)
       level = level + 1
     }
-    return(list(Table = Table,
+    return(list(Table = Table, 
                 Alpha = Alpha[,-1], type = Model_type, Teams = teams))
   }
-
+  
   if(Model_type == 'PAI'){
     theta = rep(0,ntheta(matrix, 6))
     Model = optim(par = theta, fn = Log_Like6, gr = Log_Like_deriv6, mat = matrix, method = 'BFGS')
-
+    
     least = teams[which.min(Model$par[1:length(teams)])]
-
+    
     Model$par[1:length(teams)] = Model$par[1:length(teams)] - Model$par[which(teams == least)]
     return(list(par = Model$par, teams = teams, type = Model_type))
   }
-
+  
 }
 
 # Obtains the model number based on the model specification for the BT_test() function
@@ -320,7 +341,7 @@ ModelNumber = function(model){
 BT_test = function(model1, model2, matrix, R = NULL){
   # Function for performing the hypothesis tests outlined in the thesis
   # Function fits the thetas while performing the hypothesis tests. Hence, this could also be used a precursor before obtaining theta values
-
+  
   m1 = model1; m2 = model2
   if(ModelNumber(model1) > ModelNumber(model2)){
     m1 = model2; m2 = model1
@@ -329,104 +350,104 @@ BT_test = function(model1, model2, matrix, R = NULL){
     return("Same order")
   }
   if(ModelNumber(m1) == 1 & ModelNumber(m2) == 2){
-    stat = -2*(optim(par = rep(0,ntheta(matrix,2)), fn = Log_Like2, gr = Log_Like_deriv2, method = "BFGS", mat = matrix)$value -
+    stat = -2*(optim(par = rep(0,ntheta(matrix,2)), fn = Log_Like2, gr = Log_Like_deriv2, method = "BFGS", mat = matrix)$value - 
                  optim(par = rep(0,ntheta(matrix,1)), fn = Log_Like1, gr = Log_Like_deriv1, method = "BFGS", mat = matrix)$value)
     cat('P-Value is ', 1 - pchisq(stat, 1), '\n')
     cat('with a statistic of ', stat, 'and 1 degree of freedom')
   }
   if(ModelNumber(m1) == 1 & ModelNumber(m2) == 3){
-    stat = -2*(optim(par = rep(0,ntheta(matrix,3,R)), fn = Log_Like3, gr = Log_Like_deriv3, method = "BFGS", mat = matrix, R = R)$value -
+    stat = -2*(optim(par = rep(0,ntheta(matrix,3,R)), fn = Log_Like3, gr = Log_Like_deriv3, method = "BFGS", mat = matrix, R = R)$value - 
                  optim(par = rep(0,ntheta(matrix,1)), fn = Log_Like1, gr = Log_Like_deriv1, method = "BFGS", mat = matrix)$value)
     df = ntheta(matrix,3,R) - ntheta(matrix,1)
     cat('P-Value is ', 1 - pchisq(stat, df), '\n')
     cat('with a statistic of ', stat, 'and', df, 'degrees of freedom')
   }
   if(ModelNumber(m1) == 1 & ModelNumber(m2) == 4){
-    stat = -2*(optim(par = rep(0,ntheta(matrix,4)), fn = Log_Like4, gr = Log_Like_deriv4, method = "BFGS", mat = matrix)$value -
+    stat = -2*(optim(par = rep(0,ntheta(matrix,4)), fn = Log_Like4, gr = Log_Like_deriv4, method = "BFGS", mat = matrix)$value - 
                  optim(par = rep(0,ntheta(matrix,1)), fn = Log_Like1, gr = Log_Like_deriv1, method = "BFGS", mat = matrix)$value)
     df = ntheta(matrix, 4) - ntheta(matrix,1)
     cat('P-Value is ', 1 - pchisq(stat, df), '\n')
     cat('with a statistic of ', stat, 'and', df, 'degrees of freedom')
   }
   if(ModelNumber(m1) == 1 & ModelNumber(m2) == 5){
-    stat = -2*(optim(par = rep(0,ntheta(matrix,5,R)), fn = Log_Like5, gr = Log_Like_deriv5, method = "BFGS", mat = matrix, R = R)$value -
+    stat = -2*(optim(par = rep(0,ntheta(matrix,5,R)), fn = Log_Like5, gr = Log_Like_deriv5, method = "BFGS", mat = matrix, R = R)$value - 
                  optim(par = rep(0,ntheta(matrix,1)), fn = Log_Like1, gr = Log_Like_deriv1, method = "BFGS", mat = matrix)$value)
     df = ntheta(matrix,5,R) - ntheta(matrix,1)
     cat('P-Value is ', 1 - pchisq(stat, df), '\n')
     cat('with a statistic of ', stat, 'and', df, 'degrees of freedom')
   }
   if(ModelNumber(m1) == 1 & ModelNumber(m2) == 6){
-    stat = -2*(optim(par = rep(0,ntheta(matrix,6)), fn = Log_Like6, gr = Log_Like_deriv6, method = "BFGS", mat = matrix)$value -
+    stat = -2*(optim(par = rep(0,ntheta(matrix,6)), fn = Log_Like6, gr = Log_Like_deriv6, method = "BFGS", mat = matrix)$value - 
                  optim(par = rep(0,ntheta(matrix,1)), fn = Log_Like1, gr = Log_Like_deriv1, method = "BFGS", mat = matrix)$value)
     df = ntheta(matrix,6) - ntheta(matrix,1)
     cat('P-Value is ', 1 - pchisq(stat, df), '\n')
     cat('with a statistic of ', stat, 'and', df, 'degrees of freedom')
   }
   if(ModelNumber(m1) == 2 & ModelNumber(m2) == 3){
-    stat = -2*(optim(par = rep(0,ntheta(matrix,3,R)), fn = Log_Like3, gr = Log_Like_deriv3, method = "BFGS", mat = matrix, R = R)$value -
+    stat = -2*(optim(par = rep(0,ntheta(matrix,3,R)), fn = Log_Like3, gr = Log_Like_deriv3, method = "BFGS", mat = matrix, R = R)$value - 
                  optim(par = rep(0,ntheta(matrix,2)), fn = Log_Like2, gr = Log_Like_deriv2, method = "BFGS", mat = matrix)$value)
     df = ntheta(matrix,3,R) - ntheta(matrix,2)
     cat('P-Value is ', 1 - pchisq(stat, df), '\n')
     cat('with a statistic of ', stat, 'and', df, 'degrees of freedom')
   }
   if(ModelNumber(m1) == 2 & ModelNumber(m2) == 4){
-    stat = -2*(optim(par = rep(0,ntheta(matrix,4)), fn = Log_Like4, gr = Log_Like_deriv4, method = "BFGS", mat = matrix)$value -
+    stat = -2*(optim(par = rep(0,ntheta(matrix,4)), fn = Log_Like4, gr = Log_Like_deriv4, method = "BFGS", mat = matrix)$value - 
                  optim(par = rep(0,ntheta(matrix,2)), fn = Log_Like2, gr = Log_Like_deriv2, method = "BFGS", mat = matrix)$value)
     df = ntheta(matrix,4) - ntheta(matrix,2)
     cat('P-Value is ', 1 - pchisq(stat, df), '\n')
     cat('with a statistic of ', stat, 'and', df, 'degrees of freedom')
   }
   if(ModelNumber(m1) == 2 & ModelNumber(m2) == 5){
-    stat = -2*(optim(par = rep(0,ntheta(matrix,5,R)), fn = Log_Like5, gr = Log_Like_deriv5, method = "BFGS", mat = matrix, R = R)$value -
+    stat = -2*(optim(par = rep(0,ntheta(matrix,5,R)), fn = Log_Like5, gr = Log_Like_deriv5, method = "BFGS", mat = matrix, R = R)$value - 
                  optim(par = rep(0,ntheta(matrix,2)), fn = Log_Like2, gr = Log_Like_deriv2, method = "BFGS", mat = matrix)$value)
     df = ntheta(matrix,5,R) - ntheta(matrix,2)
     cat('P-Value is ', 1 - pchisq(stat, df), '\n')
     cat('with a statistic of ', stat, 'and', df, 'degrees of freedom')
   }
   if(ModelNumber(m1) == 2 & ModelNumber(m2) == 6){
-    stat = -2*(optim(par = rep(0,ntheta(matrix,6)), fn = Log_Like6, gr = Log_Like_deriv6, method = "BFGS", mat = matrix)$value -
+    stat = -2*(optim(par = rep(0,ntheta(matrix,6)), fn = Log_Like6, gr = Log_Like_deriv6, method = "BFGS", mat = matrix)$value - 
                  optim(par = rep(0,ntheta(matrix,2)), fn = Log_Like2, gr = Log_Like_deriv2, method = "BFGS", mat = matrix)$value)
     df = ntheta(matrix,6) - ntheta(matrix,2)
     cat('P-Value is ', 1 - pchisq(stat, df), '\n')
     cat('with a statistic of ', stat, 'and', df, 'degrees of freedom')
   }
   if(ModelNumber(m1) == 3 & ModelNumber(m2) == 4){
-    stat = -2*(optim(par = rep(0,ntheta(matrix,4)), fn = Log_Like4, gr = Log_Like_deriv4, method = "BFGS", mat = matrix)$value -
+    stat = -2*(optim(par = rep(0,ntheta(matrix,4)), fn = Log_Like4, gr = Log_Like_deriv4, method = "BFGS", mat = matrix)$value - 
                  optim(par = rep(0,ntheta(matrix,3,R)), fn = Log_Like3, gr = Log_Like_deriv3, method = "BFGS", mat = matrix, R = R)$value)
     df = ntheta(matrix,4) - ntheta(matrix,3,R)
     cat('P-Value is ', 1 - pchisq(stat, df), '\n')
     cat('with a statistic of ', stat, 'and', df, 'degrees of freedom')
   }
   if(ModelNumber(m1) == 3 & ModelNumber(m2) == 5){
-    stat = -2*(optim(par = rep(0,ntheta(matrix,5,R)), fn = Log_Like5, gr = Log_Like_deriv5, method = "BFGS", mat = matrix, R = R)$value -
+    stat = -2*(optim(par = rep(0,ntheta(matrix,5,R)), fn = Log_Like5, gr = Log_Like_deriv5, method = "BFGS", mat = matrix, R = R)$value - 
                  optim(par = rep(0,ntheta(matrix,3,R)), fn = Log_Like3, gr = Log_Like_deriv3, method = "BFGS", mat = matrix, R = R)$value)
     df = ntheta(matrix,5,R) - ntheta(matrix,3,R)
     cat('P-Value is ', 1 - pchisq(stat, df), '\n')
     cat('with a statistic of ', stat, 'and', df, 'degrees of freedom')
   }
   if(ModelNumber(m1) == 3 & ModelNumber(m2) == 6){
-    stat = -2*(optim(par = rep(0,ntheta(matrix,6)), fn = Log_Like6, gr = Log_Like_deriv6, method = "BFGS", mat = matrix)$value -
+    stat = -2*(optim(par = rep(0,ntheta(matrix,6)), fn = Log_Like6, gr = Log_Like_deriv6, method = "BFGS", mat = matrix)$value - 
                  optim(par = rep(0,ntheta(matrix,3,R)), fn = Log_Like3, gr = Log_Like_deriv3, method = "BFGS", mat = matrix, R = R)$value)
     df = ntheta(matrix,6) - ntheta(matrix,3,R)
     cat('P-Value is ', 1 - pchisq(stat, df), '\n')
     cat('with a statistic of ', stat, 'and', df, 'degrees of freedom')
   }
   if(ModelNumber(m1) == 4 & ModelNumber(m2) == 5){
-    stat = -2*(optim(par = rep(0,ntheta(matrix,5,R)), fn = Log_Like5, gr = Log_Like_deriv5, method = "BFGS", mat = matrix, R = R)$value -
+    stat = -2*(optim(par = rep(0,ntheta(matrix,5,R)), fn = Log_Like5, gr = Log_Like_deriv5, method = "BFGS", mat = matrix, R = R)$value - 
                  optim(par = rep(0,ntheta(matrix,4)), fn = Log_Like4, gr = Log_Like_deriv4, method = "BFGS", mat = matrix)$value)
     df = ntheta(matrix,5,R) - ntheta(matrix,4)
     cat('P-Value is ', 1 - pchisq(stat, df), '\n')
     cat('with a statistic of ', stat, 'and', df, 'degrees of freedom')
   }
   if(ModelNumber(m1) == 4 & ModelNumber(m2) == 6){
-    stat = -2*(optim(par = rep(0,ntheta(matrix,6)), fn = Log_Like6, gr = Log_Like_deriv6, method = "BFGS", mat = matrix)$value -
+    stat = -2*(optim(par = rep(0,ntheta(matrix,6)), fn = Log_Like6, gr = Log_Like_deriv6, method = "BFGS", mat = matrix)$value - 
                  optim(par = rep(0,ntheta(matrix,4)), fn = Log_Like4, gr = Log_Like_deriv4, method = "BFGS", mat = matrix)$value)
     df = ntheta(matrix,6) - ntheta(matrix,4)
     cat('P-Value is ', 1 - pchisq(stat, df), '\n')
     cat('with a statistic of ', stat, 'and', df, 'degrees of freedom')
   }
   if(ModelNumber(m1) == 5 & ModelNumber(m2) == 6){
-    stat = -2*(optim(par = rep(0,ntheta(matrix,6)), fn = Log_Like6, gr = Log_Like_deriv6, method = "BFGS", mat = matrix)$value -
+    stat = -2*(optim(par = rep(0,ntheta(matrix,6)), fn = Log_Like6, gr = Log_Like_deriv6, method = "BFGS", mat = matrix)$value - 
                  optim(par = rep(0,ntheta(matrix,5,R)), fn = Log_Like5, gr = Log_Like_deriv5, method = "BFGS", mat = matrix, R = R)$value)
     df = ntheta(matrix,6) - ntheta(matrix,5,R)
     cat('P-Value is ', 1 - pchisq(stat, df), '\n')
@@ -438,7 +459,7 @@ BT_test = function(model1, model2, matrix, R = NULL){
 BT_plots = function(model){
   # Takes a fitted Bradley-Terry model from the BT_Model() function and produces a plot of the theta values by team.
   # For hierarchical models (CHI and HIE), it prints each plot every ten seconds, starting with R_1, up to R_n
-
+  
   if(model$type == 'VAN'){
     # Vanilla Model
     Teams = model$Teams
@@ -450,10 +471,9 @@ BT_plots = function(model){
       ggplot() + aes(x=Teams, y=Theta) +
       geom_segment( aes(x=Teams, xend=Teams, y=0, yend=Theta), color="black") +
       geom_point(color=rgb(0.2,0.7,0.1,0.5), size=3, alpha=0.6) +
-      ylab("Theta") + xlab("Teams") +
+      ylab("Theta") + xlab("Teams") + 
       theme_light() +
       coord_flip() +
-      ggtitle("Team rankings of this season - VAN model")+
       theme(
         panel.grid.major.y = element_blank(),
         panel.border = element_blank(),
@@ -476,6 +496,7 @@ BT_plots = function(model){
       geom_point(aes(x=Teams, y=home), color=rgb(0.7,0.2,0.1,0.5), size=3, alpha = 0.6 ) +
       coord_flip()+
       theme_light()+
+      ggtitle("Team rankings of this season - CHA model")+
       theme(
         panel.grid.major.y = element_blank(),
         panel.border = element_blank(),
@@ -507,14 +528,14 @@ BT_plots = function(model){
       Sys.sleep(10)
     }
   }
-
+  
   if(model$type == 'TSH'){
     # Team-specific Home-ground Advantage Model
     table = data.frame(teams = model$Teams, Theta = model$Table, home = NA)
     for (i in 1:nrow(model$Table)){
       table$home[i] <- model$Table[i,] + model$Alpha[i,]
     }
-    table$midpoint <- (table$Theta + table$home) / 2  
+    table$midpoint <- (table$Theta + table$home) / 2
     Teams = model$Teams
     #Theta = table[order(-table$Theta),]
     Theta = table[order(-table$midpoint),]
@@ -525,7 +546,7 @@ BT_plots = function(model){
       geom_segment(aes(x=Teams, xend=Teams, y=Theta, yend=home), color="black") +
       geom_point(aes(x=Teams, y=Theta), color=rgb(0.2,0.7,0.1,0.5), size=3, alpha = 0.6 ) +
       geom_point(aes(x=Teams, y=home), color=rgb(0.7,0.2,0.1,0.5), size=3, alpha = 0.6 ) +
-      geom_point(aes(x=Teams, y=midpoint), color="navy", size=3, alpha=0.6) +
+      geom_point(aes(x=Teams, y=midpoint), color="navy", size=3, alpha=0.6) + 
       coord_flip()+
       theme_light()+
       theme(
@@ -591,7 +612,7 @@ BT_predict = function(model, df, R = NULL){
           df$Team_B_win[i] = exp(Table[df[i,2],] + model$Alpha[df[i,2], R[df[i,2],df[i,1]]])/(exp(Table[df[i,2],] + model$Alpha[df[i,2], R[df[i,2],df[i,1]]]) + exp(Table[df[i,1],]))
           df$Team_A_win[i] = 1 - df$Team_B_win[i]
         }
-      }
+      } 
       if(df[i,3] == df[i,4]){
         # Essentially saying Team A Home = 0 and Team B Home = 0
         if(model$type == 'VAN'){
@@ -624,31 +645,30 @@ BT_predict = function(model, df, R = NULL){
 
 # 2
 # Past years model
-
 rawdata <- read_excel("NBA Data 2018-19 to 2022-23.xlsx")
 formaldata<-DesiredFormatNBA(rawdata)
 matdata<-Data2Mat(formaldata)
-fixtures= formaldata#
+fixtures= formaldata
 NBA_R = function(fixtures){
   data = fixtures
   Teams = unique(fixtures$Team.B)
-
+  
   Atlantic = c('Boston Celtics', 'Brooklyn Nets', 'New York Knicks', 'Philadelphia 76ers', 'Toronto Raptors')
   Central = c('Chicago Bulls', 'Cleveland Cavaliers', 'Detroit Pistons', 'Indiana Pacers', 'Milwaukee Bucks')
   Southeast = c('Atlanta Hawks', 'Charlotte Hornets', 'Miami Heat', 'Orlando Magic', 'Washington Wizards')
   Northwest = c('Denver Nuggets', 'Minnesota Timberwolves', 'Oklahoma City Thunder', 'Portland Trail Blazers', 'Utah Jazz')
   Pacific = c('Golden State Warriors', 'Los Angeles Clippers', 'Los Angeles Lakers', 'Phoenix Suns','Sacramento Kings')
   Southwest = c('Dallas Mavericks', 'Houston Rockets','Memphis Grizzlies','New Orleans Pelicans','San Antonio Spurs')
-
+  
   D = matrix(data = 0, nrow = length(Teams), ncol = length(Teams), dimnames = list(Teams, Teams))
   C = matrix(data = 0, nrow = length(Teams), ncol = length(Teams), dimnames = list(Teams, Teams))
   L = matrix(data = 0, nrow = length(Teams), ncol = length(Teams), dimnames = list(Teams, Teams))
   R = matrix(data = 0, nrow = length(Teams), ncol = length(Teams), dimnames = list(Teams, Teams))
-
+  
   East = data.frame(Atlantic, Southeast, Central)
   West = data.frame(Southwest, Pacific, Northwest)
   NBA = data.frame(East, West)
-
+  
   # Basic designation of relationship
   for(i in Teams){
     for(j in Teams){
@@ -657,7 +677,7 @@ NBA_R = function(fixtures){
       }
     }
   }
-
+  
   # Designating Conferences
   for(con1 in 1:ncol(East)){
     for(con2 in 1:ncol(East)){
@@ -670,19 +690,19 @@ NBA_R = function(fixtures){
       }
     }
   }
-
+  
   for(con1 in 1:ncol(West)){
     for(con2 in 1:ncol(West)){
       for(i in 1:nrow(West[con1])){
         for(j in 1:nrow(West[con2])){
           if(West[i, con1] != West[j, con2]){
             C[West[i, con1], West[j, con2]] = 1
-          }
+          }  
         }
       }
     }
   }
-
+  
   # Designating Divisions
   for(div in 1:ncol(NBA)){
     for(i in 1:nrow(NBA[div])){
@@ -692,13 +712,13 @@ NBA_R = function(fixtures){
       }
     }
   }
-
+  
   R = C + D + L
   return(R)
 }
 R <- NBA_R(fixtures)
-VAN = BT_Model(matdata,'VAN',R=R)
-Teams <-VAN$Teams
+CHA = BT_Model(matdata,'CHA',R=R)
+Teams <-CHA$Teams
 
 
 # 3
@@ -707,11 +727,11 @@ Teams <-VAN$Teams
 rawdatanew <- read_excel("2023-2024 regular.xlsx")
 formaldatanew<-DesiredFormatNBA(rawdatanew)
 matdatanew<-Data2Mat(formaldatanew)
-VAN_2024 = BT_Model(matdatanew,'VAN',R=R)
-modelplot<-BT_plots(VAN_2024)
+CHA_2024 = BT_Model(matdatanew,'CHA',R=R)
+modelplot<-BT_plots(CHA_2024)
+
 # 4
 # Simulation for new seasons playin
-
 #Prob for playin
 Simulation_Play_In = function(model, df, R){
   # A small function to obtain the probabilities for a play-in tournament 
@@ -797,10 +817,10 @@ playin2024 <- read_csv("2023-2024 palyin.csv", col_types = cols_only(
 ))
 
 playin2024 <- as.data.frame(playin2024)
-ProbabilitiesVAN <- BT_predict(VAN_2024, formaldatanew, R)
+ProbabilitiesCHA <- BT_predict(CHA_2024, formaldatanew, R)
 
 Seedsrun <- function() {
-  Seeds <<- PlayInTournament(VAN_2024, playin2024, R)  
+  Seeds <<- PlayInTournament(CHA_2024, playin2024, R)
   Seeds <<- as.data.frame(Seeds)  
   return(Seeds)
 }
@@ -900,10 +920,8 @@ Simulation_Playoff_East = function(df, SE, Probabilities){
   return(p)
 }
 playoffs_East <- as.data.frame(read_csv("Playoffs_East2023.csv", show_col_types = FALSE))
-
-
 East <- function() {
-  result <- Simulation_Playoff_East(playoffs_East, Seedsofeast, ProbabilitiesVAN)
+  result <- Simulation_Playoff_East(playoffs_East, Seedsofeast, ProbabilitiesCHA)
   EastResult <<- result
   return(EastResult)
 }
@@ -998,9 +1016,8 @@ Simulation_Playoff_West = function(df, SW, Probabilities){
   return(p)
 }
 Seedsofwest<-Seeds_West(Seeds)
-
 West <- function() {
-  result <- Simulation_Playoff_West(playoffs_West, Seedsofwest, ProbabilitiesVAN)
+  result <- Simulation_Playoff_West(playoffs_West, Seedsofwest, ProbabilitiesCHA)
   WestResult <<- result
   return(WestResult)
 }
@@ -1022,7 +1039,6 @@ Seeds_Tournament = function(){
 }
 ST<-Seeds_Tournament()
 Final = function(ST){
-  
   Finalteam <- data.frame(matrix(ncol = 2))
   colnames(Finalteam) <- c("Team.A", "Team.B")
   Finalteam[,1] <- EastResult$Winner[7]
@@ -1062,40 +1078,40 @@ Simulation_Final = function(df, Probabilities){
 }
 #Finalgame<-Simulation_Final(Finalteam, ProbabilitiesCHI)
 Finalgame2 = function(){
-  return(Simulation_Final(Finalteam, ProbabilitiesVAN))
+  return(Simulation_Final(Finalteam, ProbabilitiesCHA))
   
 }
 
 NBAPLAYOFFS <- function() {
   # Combine all the functions to obtain results of the simulations
-  Seeds <- PlayInTournament(VAN_2024, playin2024, R = R)  
+  Seeds <- PlayInTournament(CHA_2024, playin2024, R = R) 
+  Seedsofeast <- Seeds_East(Seeds)
+  EastResult <- East() 
+  Seedsofwest <- Seeds_West(Seeds)
+  WestResult <- West() 
+  ST <- Seeds_Tournament()
+  Finalteam <- Final(ST)
+  Championship <- Finalgame2() 
+  Output <- data.frame(EastResult)
+  colnames(Output) <- c("Team.A", "Team.B", "Home_Win", "Winner", "TeamA_home_win_prob", "TeamA_away_win_prob")
+  Output[8:14, ] <- WestResult 
+  Output[15, ] <- Championship  
+  return(Output) 
+}
+
+NBA <- function() {
+  # Combine all the functions to obtain results of the simulations
+  Seeds <- PlayInTournament(CHA_2024, playin2024, R = R)  
   Seedsofeast <- Seeds_East(Seeds)
   EastResult <- East()  
   Seedsofwest <- Seeds_West(Seeds)
   WestResult <- West()  
   ST <- Seeds_Tournament()
-  Finalteam <- Final(ST) 
-  Championship <- Finalgame2()  
-  Output <- data.frame(EastResult)
-  colnames(Output) <- c("Team.A", "Team.B", "Home_Win", "Winner", "TeamA_home_win_prob", "TeamA_away_win_prob")
-  Output[8:14, ] <- WestResult  
-  Output[15, ] <- Championship  
-  
-  return(Output)  
-}
-
-NBA <- function() {
-  # Combine all the functions to obtain results of the simulations
-  Seeds <- PlayInTournament(VAN_2024, playin2024, R = R)  
-  Seedsofeast <- Seeds_East(Seeds)
-  EastResult <- East()  
-  Seedsofwest <- Seeds_West(Seeds)
-  WestResult <- West() 
-  ST <- Seeds_Tournament()
   Finalteam <- Final(ST)  
-  Championship <- Finalgame2()  
+  Championship <- Finalgame2() 
   Output <- data.frame(EastResult)
-  colnames(Output) <- c("Team.A", "Team.B", "Home_Win", "Winner", "TeamA_home_win_prob", "TeamA_away_win_prob")
+  colnames(Output) <- c("Team.A", "Team.B", "Home_Win", "Winner",
+                        "TeamA_home_win_prob", "TeamA_away_win_prob")
   Output[8:14, ] <- WestResult  
   Output[15, ] <- Championship  
   return(Championship$Winner)  

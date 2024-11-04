@@ -1,5 +1,4 @@
-
-#VAN model
+#when HIE model
 library(readxl)
 library(readr)
 library(stats)
@@ -143,35 +142,54 @@ NBA_R = function(fixtures){
 
 #R <- NBA_R(fixtures)
 
-Log_Like1 = function(theta, mat){
+# Defining a log-likelihood function - Hierarchical model
+Log_Like5 = function(theta, mat, R){
   # mat contains mat$h, mat$w, mat$l, mat$nw, mat$nl
   # theta is the vector of thetas (skill levels)
   Teams = colnames(mat$h)
+  number = length(Teams)
 
-  log_like1 = 0
+  log_like5 = 0
 
-  for(i in 1:length(Teams)){
-    for(j in 1:length(Teams)){
-      log_like1 = log_like1 + (mat$w[i, j] + mat$l[j, i] + mat$nw[i, j])*(theta[i] - log(exp(theta[i]) + exp(theta[j])))
+  for(i in (1:number)){
+    for(j in (1:number)[-i]){
+      log_like5 = log_like5 +
+        mat$w[i,j]*(theta[i] + theta[i + number * R[i,j]] - log(exp(theta[i] + theta[i + number * R[i,j]]) + exp(theta[j]))) +
+        mat$l[j,i]*(theta[i] - log(exp(theta[i]) + exp(theta[j + number * R[i,j]] + theta[j]))) +
+        mat$nw[i,j]*(theta[i] - log(exp(theta[i]) + exp(theta[j])))
     }
   }
-  return(-log_like1)
+  return(-1*log_like5)
 }
 
-# Defining a gradient for the likelihood function
-Log_Like_deriv1 = function(theta, mat){
+# Defining a gradient for the likelihood function - Hierarchical model
+Log_Like_deriv5 = function(theta, mat, R){
   Teams = colnames(mat$h)
-  output = rep(0,ntheta(mat, 1, R))
-  for(i in 1:length(Teams)){
-    log_like_deriv1 = 0
-    for(j in 1:length(Teams)){
-      log_like_deriv1 = log_like_deriv1 - (mat$h[i,j] + mat$h[j,i] + mat$nw[i,j] + mat$nw[j,i])*((exp(theta[i]))/(exp(theta[i]) + exp(theta[j])))
+  number = length(Teams)
+  output = rep(0,ntheta(mat, 5, R))
+
+  # dL/dtheta
+  for(i in 1:number){
+    log_like_deriv5 = 0
+    for(j in (1:number)[-i]){
+      log_like_deriv5 = log_like_deriv5  + mat$w[i,j] + mat$l[j,i] + mat$nw[i,j] -
+        (mat$h[i,j] * (exp(theta[i] + theta[i + number * R[i,j]])/(exp(theta[i] + theta[i + number * R[i,j]]) + exp(theta[j])))) -
+        (mat$h[j,i] * (exp(theta[i])/(exp(theta[j] + theta[j + number * R[j,i]]) + exp(theta[i])))) -
+        (mat$nw[i,j] * (exp(theta[i])/(exp(theta[i]) + exp(theta[j])))) -
+        (mat$nw[j,i] * (exp(theta[i])/(exp(theta[i]) + exp(theta[j]))))
     }
-    output[i] = sum(mat$w[i,]) + sum(mat$l[,i]) + sum(mat$nw[i,]) + log_like_deriv1
+    output[i] = log_like_deriv5
+  }
+
+  # dL/dAlpha
+  for (i in 1:number){
+    for (j in (1:number)){
+      output[i + number * R[i,j]] = output[i + number * R[i,j]] + mat$w[i,j] -
+        ((mat$h[i,j])*(exp(theta[i] + theta[i + number * R[i,j]]))/(exp(theta[i] + theta[i + number * R[i,j]]) + exp(theta[j])))
+    }
   }
   return(-1*output)
 }
-
 PCT_Table <- function(matrix){
   #Returns the wins and losses of the teams, along with their winning percentage
   Wins <- NA
@@ -453,7 +471,6 @@ BT_plots = function(model){
       ylab("Theta") + xlab("Teams") +
       theme_light() +
       coord_flip() +
-      ggtitle("Team rankings of this season - VAN model")+
       theme(
         panel.grid.major.y = element_blank(),
         panel.border = element_blank(),
@@ -507,60 +524,45 @@ BT_plots = function(model){
       Sys.sleep(10)
     }
   }
-
-  if(model$type == 'TSH'){
-    # Team-specific Home-ground Advantage Model
-    table = data.frame(teams = model$Teams, Theta = model$Table, home = NA)
-    for (i in 1:nrow(model$Table)){
-      table$home[i] <- model$Table[i,] + model$Alpha[i,]
-    }
-    table$midpoint <- (table$Theta + table$home) / 2  
-    Teams = model$Teams
-    #Theta = table[order(-table$Theta),]
-    Theta = table[order(-table$midpoint),]
-    PLOT <- Theta %>%
-      arrange(midpoint) %>%
-      mutate(Teams = factor(teams, unique(teams))) %>%
-      ggplot() +
-      geom_segment(aes(x=Teams, xend=Teams, y=Theta, yend=home), color="black") +
-      geom_point(aes(x=Teams, y=Theta), color=rgb(0.2,0.7,0.1,0.5), size=3, alpha = 0.6 ) +
-      geom_point(aes(x=Teams, y=home), color=rgb(0.7,0.2,0.1,0.5), size=3, alpha = 0.6 ) +
-      geom_point(aes(x=Teams, y=midpoint), color="navy", size=3, alpha=0.6) +
-      coord_flip()+
-      theme_light()+
-      theme(
-        panel.grid.major.y = element_blank(),
-        panel.border = element_blank(),
-        axis.ticks.y = element_blank())+
-      xlab("Teams") +
-      ylab("Theta(TSH)")
-    return(PLOT)
-  }
-  if(model$type == "HIE"){
+  if(model$type == "HIE") {
     # Hierarchical Home-ground Advantage Model
-    for(i in 1:ncol(model$Alpha)){
-      table = data.frame(teams = model$Teams, Theta = model$Table[,], home = model$Table[,] + model$Alpha[,i])
-      Teams = model$Teams
-      Theta = table[order(-table$Theta),]
-      print(Theta %>%
-              arrange(Theta) %>%
-              mutate(Teams = factor(teams, unique(teams))) %>%
-              ggplot() +
-              geom_segment(aes(x=Teams, xend=Teams, y=Theta, yend=home), color="black") +
-              geom_point(aes(x=Teams, y=Theta), color=rgb(0.2,0.7,0.1,0.5), size=3, alpha = 0.6 ) +
-              geom_point(aes(x=Teams, y=home), color=rgb(0.7,0.2,0.1,0.5), size=3, alpha = 0.6 ) +
-              coord_flip()+
-              theme_light()+
-              theme(
-                panel.grid.major.y = element_blank(),
-                panel.border = element_blank(),
-                axis.ticks.y = element_blank())+
-              xlab("Teams") + ylab("Theta"))
-      Sys.sleep(5)
+    plots_list <- list()  
+    for(i in 1:ncol(model$Alpha)) {
+      table <- data.frame(
+        teams = model$Teams,
+        Theta = model$Table[, ],
+        home = model$Table[, ] + model$Alpha[, i]
+      )
+      table$midpoint <- (table$Theta + table$home) / 2  
+      Theta = table[order(-table$midpoint), ]
+      PLOT <- Theta %>%
+        arrange(midpoint) %>%
+        mutate(Teams = factor(teams, unique(teams))) %>%
+        ggplot() +
+        geom_segment(aes(x=Teams, xend=Teams, y=Theta, yend=home), color="black") +
+        geom_point(aes(x=Teams, y=Theta), color=rgb(0.2,0.7,0.1,0.5), size=3, alpha=0.6) +
+        geom_point(aes(x=Teams, y=home), color=rgb(0.7,0.2,0.1,0.5), size=3, alpha=0.6) +
+        geom_point(aes(x=Teams, y=midpoint), color="navy", size=3, alpha=0.6) + 
+        coord_flip() +
+        theme_light() +
+        theme(
+          panel.grid.major.y = element_blank(),
+          panel.border = element_blank(),
+          axis.ticks.y = element_blank()
+        ) +
+        xlab("Teams") +
+        ylab("Theta(HIE)") +
+        ggtitle(paste("Team rankings of this season - HIE model, Alpha", i))
+      
+      plots_list[[length(plots_list) + 1]] <- PLOT  
+      Sys.sleep(3)  
     }
+    return(plots_list)  
   }
-}
+  
 
+
+}
 BT_predict = function(model, df, R = NULL){
   # Predicts the probability of either side winning a match based off the fitted BT Model
   # Data frame consists of Team A, Team B, Team A Home, Team B Home
@@ -624,11 +626,10 @@ BT_predict = function(model, df, R = NULL){
 
 # 2
 # Past years model
-
 rawdata <- read_excel("NBA Data 2018-19 to 2022-23.xlsx")
 formaldata<-DesiredFormatNBA(rawdata)
 matdata<-Data2Mat(formaldata)
-fixtures= formaldata#
+fixtures= formaldata
 NBA_R = function(fixtures){
   data = fixtures
   Teams = unique(fixtures$Team.B)
@@ -697,9 +698,8 @@ NBA_R = function(fixtures){
   return(R)
 }
 R <- NBA_R(fixtures)
-VAN = BT_Model(matdata,'VAN',R=R)
-Teams <-VAN$Teams
-
+HIE = BT_Model(matdata,'HIE',R=R)
+Teams <-HIE$Teams
 
 # 3
 # simulation for new season
@@ -707,11 +707,12 @@ Teams <-VAN$Teams
 rawdatanew <- read_excel("2023-2024 regular.xlsx")
 formaldatanew<-DesiredFormatNBA(rawdatanew)
 matdatanew<-Data2Mat(formaldatanew)
-VAN_2024 = BT_Model(matdatanew,'VAN',R=R)
-modelplot<-BT_plots(VAN_2024)
+HIE_2024 = BT_Model(matdatanew,'HIE',R=R)
+modelplot<- BT_plots(HIE_2024)
+
+
 # 4
 # Simulation for new seasons playin
-
 #Prob for playin
 Simulation_Play_In = function(model, df, R){
   # A small function to obtain the probabilities for a play-in tournament 
@@ -786,7 +787,6 @@ PlayInTournament = function(model, df, R){
   }
   Output <- Seeds
   return(Output)
-  # Returns the seeds of the teams after the completion of the tournament
 } 
 
 playin2024 <- read_csv("2023-2024 palyin.csv", col_types = cols_only(
@@ -797,10 +797,10 @@ playin2024 <- read_csv("2023-2024 palyin.csv", col_types = cols_only(
 ))
 
 playin2024 <- as.data.frame(playin2024)
-ProbabilitiesVAN <- BT_predict(VAN_2024, formaldatanew, R)
+ProbabilitiesHIE <- BT_predict(HIE_2024, formaldatanew, R)
 
 Seedsrun <- function() {
-  Seeds <<- PlayInTournament(VAN_2024, playin2024, R)  
+  Seeds <<- PlayInTournament(HIE_2024, playin2024, R)  
   Seeds <<- as.data.frame(Seeds)  
   return(Seeds)
 }
@@ -900,10 +900,8 @@ Simulation_Playoff_East = function(df, SE, Probabilities){
   return(p)
 }
 playoffs_East <- as.data.frame(read_csv("Playoffs_East2023.csv", show_col_types = FALSE))
-
-
 East <- function() {
-  result <- Simulation_Playoff_East(playoffs_East, Seedsofeast, ProbabilitiesVAN)
+  result <- Simulation_Playoff_East(playoffs_East, Seedsofeast, ProbabilitiesHIE)
   EastResult <<- result
   return(EastResult)
 }
@@ -929,6 +927,9 @@ Simulation_Playoff_West = function(df, SW, Probabilities){
   p$Winner <- NA
   p$TeamA_home_win_prob <-NA
   p$TeamA_away_win_prob <-NA
+  # 查看 p 中的队伍名称
+  #print(unique(p$Team.A))
+  #print(unique(p$Team.B))
   for (i in 1:nrow(p)){
     p$TeamA_home_win_prob[i] <- Probabilities$Team_B_win[Probabilities$Team.A == p[i,2] & Probabilities$Team.B == p[i,1]][1]
     p$TeamA_away_win_prob[i] <- Probabilities$Team_A_win[Probabilities$Team.A == p[i,1] & Probabilities$Team.B == p[i,2]][1]
@@ -998,9 +999,8 @@ Simulation_Playoff_West = function(df, SW, Probabilities){
   return(p)
 }
 Seedsofwest<-Seeds_West(Seeds)
-
 West <- function() {
-  result <- Simulation_Playoff_West(playoffs_West, Seedsofwest, ProbabilitiesVAN)
+  result <- Simulation_Playoff_West(playoffs_West, Seedsofwest, ProbabilitiesHIE)
   WestResult <<- result
   return(WestResult)
 }
@@ -1022,7 +1022,6 @@ Seeds_Tournament = function(){
 }
 ST<-Seeds_Tournament()
 Final = function(ST){
-  
   Finalteam <- data.frame(matrix(ncol = 2))
   colnames(Finalteam) <- c("Team.A", "Team.B")
   Finalteam[,1] <- EastResult$Winner[7]
@@ -1036,6 +1035,7 @@ Final = function(ST){
   
 }
 #Finalteam<- Final(ST)
+
 
 Simulation_Final = function(df, Probabilities){
   # df is the output from the function Final(), which adjusts the seeding to obtain the extra home court game
@@ -1062,35 +1062,17 @@ Simulation_Final = function(df, Probabilities){
 }
 #Finalgame<-Simulation_Final(Finalteam, ProbabilitiesCHI)
 Finalgame2 = function(){
-  return(Simulation_Final(Finalteam, ProbabilitiesVAN))
+  return(Simulation_Final(Finalteam, ProbabilitiesHIE))
   
 }
 
 NBAPLAYOFFS <- function() {
   # Combine all the functions to obtain results of the simulations
-  Seeds <- PlayInTournament(VAN_2024, playin2024, R = R)  
+  Seeds <- PlayInTournament(HIE_2024, playin2024, R = R)  
   Seedsofeast <- Seeds_East(Seeds)
-  EastResult <- East()  
+  EastResult <- East() 
   Seedsofwest <- Seeds_West(Seeds)
   WestResult <- West()  
-  ST <- Seeds_Tournament()
-  Finalteam <- Final(ST) 
-  Championship <- Finalgame2()  
-  Output <- data.frame(EastResult)
-  colnames(Output) <- c("Team.A", "Team.B", "Home_Win", "Winner", "TeamA_home_win_prob", "TeamA_away_win_prob")
-  Output[8:14, ] <- WestResult  
-  Output[15, ] <- Championship  
-  
-  return(Output)  
-}
-
-NBA <- function() {
-  # Combine all the functions to obtain results of the simulations
-  Seeds <- PlayInTournament(VAN_2024, playin2024, R = R)  
-  Seedsofeast <- Seeds_East(Seeds)
-  EastResult <- East()  
-  Seedsofwest <- Seeds_West(Seeds)
-  WestResult <- West() 
   ST <- Seeds_Tournament()
   Finalteam <- Final(ST)  
   Championship <- Finalgame2()  
@@ -1098,5 +1080,22 @@ NBA <- function() {
   colnames(Output) <- c("Team.A", "Team.B", "Home_Win", "Winner", "TeamA_home_win_prob", "TeamA_away_win_prob")
   Output[8:14, ] <- WestResult  
   Output[15, ] <- Championship  
-  return(Championship$Winner)  
+  return(Output)  
+}
+
+NBA <- function() {
+  # Combine all the functions to obtain results of the simulations
+  Seeds <- PlayInTournament(HIE_2024, playin2024, R = R) 
+  Seedsofeast <- Seeds_East(Seeds)
+  EastResult <- East()  
+  Seedsofwest <- Seeds_West(Seeds)
+  WestResult <- West()  
+  ST <- Seeds_Tournament()
+  Finalteam <- Final(ST)  
+  Championship <- Finalgame2() 
+  Output <- data.frame(EastResult)
+  colnames(Output) <- c("Team.A", "Team.B", "Home_Win", "Winner", "TeamA_home_win_prob", "TeamA_away_win_prob")
+  Output[8:14, ] <- WestResult  
+  Output[15, ] <- Championship 
+  return(Championship$Winner) 
 }

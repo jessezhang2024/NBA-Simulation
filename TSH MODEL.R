@@ -1,5 +1,4 @@
-
-#VAN model
+#when TSH model
 library(readxl)
 library(readr)
 library(stats)
@@ -143,31 +142,52 @@ NBA_R = function(fixtures){
 
 #R <- NBA_R(fixtures)
 
-Log_Like1 = function(theta, mat){
+# Defining a log-likelihood function - Team-Specific Homeground model
+Log_Like4 = function(theta, mat){
   # mat contains mat$h, mat$w, mat$l, mat$nw, mat$nl
   # theta is the vector of thetas (skill levels)
   Teams = colnames(mat$h)
+  number = length(Teams)
 
-  log_like1 = 0
+  log_like4 = 0
 
-  for(i in 1:length(Teams)){
-    for(j in 1:length(Teams)){
-      log_like1 = log_like1 + (mat$w[i, j] + mat$l[j, i] + mat$nw[i, j])*(theta[i] - log(exp(theta[i]) + exp(theta[j])))
+  for(i in 1:number){
+    for(j in 1:number){
+      log_like4 = log_like4 +
+        mat$w[i,j]*(theta[i] + theta[i+number] - log(exp(theta[i] + theta[i+number]) + exp(theta[j]))) +
+        mat$l[j, i]*(theta[i] - log(exp(theta[i]) + exp(theta[j+number] + theta[j]))) +
+        mat$nw[i,j]*(theta[i] - log(exp(theta[i])+exp(theta[j])))
     }
   }
-  return(-log_like1)
+  return(-1*log_like4)
 }
 
-# Defining a gradient for the likelihood function
-Log_Like_deriv1 = function(theta, mat){
+# Defining a gradient for the likelihood function - Team-Specific Homeground
+Log_Like_deriv4 = function(theta, mat){
   Teams = colnames(mat$h)
-  output = rep(0,ntheta(mat, 1, R))
-  for(i in 1:length(Teams)){
-    log_like_deriv1 = 0
-    for(j in 1:length(Teams)){
-      log_like_deriv1 = log_like_deriv1 - (mat$h[i,j] + mat$h[j,i] + mat$nw[i,j] + mat$nw[j,i])*((exp(theta[i]))/(exp(theta[i]) + exp(theta[j])))
+  number = length(Teams)
+  output = rep(0,ntheta(mat, 4, R))
+
+  # dL/dtheta
+  for(i in 1:number){
+    log_like_deriv4 = 0
+    for(j in 1:number){
+      log_like_deriv4 = log_like_deriv4 -
+        (mat$h[i,j])*((exp(theta[i] + theta[i+number]))/(exp(theta[i] + theta[i+number]) + exp(theta[j]))) -
+        (mat$h[j,i])*((exp(theta[i]))/(exp(theta[j] + theta[j+number]) + exp(theta[i]))) -
+        (mat$nw[i,j])*(exp(theta[i]))/(exp(theta[i]) + exp(theta[j])) -
+        (mat$nw[j,i])*(exp(theta[i]))/(exp(theta[i]) + exp(theta[j]))
     }
-    output[i] = sum(mat$w[i,]) + sum(mat$l[,i]) + sum(mat$nw[i,]) + log_like_deriv1
+    output[i] = sum(mat$w[i,]) + sum(mat$l[,i]) + sum(mat$nw[i,]) + log_like_deriv4
+  }
+
+  # dL/dAlpha
+  for(i in 1:number){
+    alpha = 0
+    for(j in 1:number){
+      alpha = alpha - ((mat$h[i,j])*(exp(theta[i] + theta[i+number]))/(exp(theta[i] + theta[i+number]) + exp(theta[j])))
+    }
+    output[number + i] = sum(mat$w[i,]) + alpha
   }
   return(-1*output)
 }
@@ -453,7 +473,6 @@ BT_plots = function(model){
       ylab("Theta") + xlab("Teams") +
       theme_light() +
       coord_flip() +
-      ggtitle("Team rankings of this season - VAN model")+
       theme(
         panel.grid.major.y = element_blank(),
         panel.border = element_blank(),
@@ -508,7 +527,7 @@ BT_plots = function(model){
     }
   }
 
-  if(model$type == 'TSH'){
+  if(model$type == "TSH") {
     # Team-specific Home-ground Advantage Model
     table = data.frame(teams = model$Teams, Theta = model$Table, home = NA)
     for (i in 1:nrow(model$Table)){
@@ -525,7 +544,7 @@ BT_plots = function(model){
       geom_segment(aes(x=Teams, xend=Teams, y=Theta, yend=home), color="black") +
       geom_point(aes(x=Teams, y=Theta), color=rgb(0.2,0.7,0.1,0.5), size=3, alpha = 0.6 ) +
       geom_point(aes(x=Teams, y=home), color=rgb(0.7,0.2,0.1,0.5), size=3, alpha = 0.6 ) +
-      geom_point(aes(x=Teams, y=midpoint), color="navy", size=3, alpha=0.6) +
+      geom_point(aes(x=Teams, y=midpoint), color="navy", size=3, alpha=0.6) + 
       coord_flip()+
       theme_light()+
       theme(
@@ -533,9 +552,11 @@ BT_plots = function(model){
         panel.border = element_blank(),
         axis.ticks.y = element_blank())+
       xlab("Teams") +
-      ylab("Theta(TSH)")
+      ylab("Theta(TSH)")+
+    ggtitle("Team rankings of this season - TSH model")
     return(PLOT)
   }
+
   if(model$type == "HIE"){
     # Hierarchical Home-ground Advantage Model
     for(i in 1:ncol(model$Alpha)){
@@ -624,11 +645,10 @@ BT_predict = function(model, df, R = NULL){
 
 # 2
 # Past years model
-
 rawdata <- read_excel("NBA Data 2018-19 to 2022-23.xlsx")
 formaldata<-DesiredFormatNBA(rawdata)
 matdata<-Data2Mat(formaldata)
-fixtures= formaldata#
+fixtures= formaldata
 NBA_R = function(fixtures){
   data = fixtures
   Teams = unique(fixtures$Team.B)
@@ -697,8 +717,8 @@ NBA_R = function(fixtures){
   return(R)
 }
 R <- NBA_R(fixtures)
-VAN = BT_Model(matdata,'VAN',R=R)
-Teams <-VAN$Teams
+TSH = BT_Model(matdata,'TSH',R=R)
+Teams <-TSH$Teams
 
 
 # 3
@@ -707,11 +727,11 @@ Teams <-VAN$Teams
 rawdatanew <- read_excel("2023-2024 regular.xlsx")
 formaldatanew<-DesiredFormatNBA(rawdatanew)
 matdatanew<-Data2Mat(formaldatanew)
-VAN_2024 = BT_Model(matdatanew,'VAN',R=R)
-modelplot<-BT_plots(VAN_2024)
+TSH_2024 = BT_Model(matdatanew,'TSH',R=R)
+modelplot<-BT_plots(TSH_2024)
+
 # 4
 # Simulation for new seasons playin
-
 #Prob for playin
 Simulation_Play_In = function(model, df, R){
   # A small function to obtain the probabilities for a play-in tournament 
@@ -797,11 +817,11 @@ playin2024 <- read_csv("2023-2024 palyin.csv", col_types = cols_only(
 ))
 
 playin2024 <- as.data.frame(playin2024)
-ProbabilitiesVAN <- BT_predict(VAN_2024, formaldatanew, R)
+ProbabilitiesTSH <- BT_predict(TSH_2024, formaldatanew, R)
 
 Seedsrun <- function() {
-  Seeds <<- PlayInTournament(VAN_2024, playin2024, R)  
-  Seeds <<- as.data.frame(Seeds)  
+  Seeds <<- PlayInTournament(TSH_2024, playin2024, R)  
+  Seeds <<- as.data.frame(Seeds)
   return(Seeds)
 }
 Seeds<-Seedsrun()
@@ -903,7 +923,7 @@ playoffs_East <- as.data.frame(read_csv("Playoffs_East2023.csv", show_col_types 
 
 
 East <- function() {
-  result <- Simulation_Playoff_East(playoffs_East, Seedsofeast, ProbabilitiesVAN)
+  result <- Simulation_Playoff_East(playoffs_East, Seedsofeast, ProbabilitiesTSH)
   EastResult <<- result
   return(EastResult)
 }
@@ -1000,7 +1020,7 @@ Simulation_Playoff_West = function(df, SW, Probabilities){
 Seedsofwest<-Seeds_West(Seeds)
 
 West <- function() {
-  result <- Simulation_Playoff_West(playoffs_West, Seedsofwest, ProbabilitiesVAN)
+  result <- Simulation_Playoff_West(playoffs_West, Seedsofwest, ProbabilitiesTSH)
   WestResult <<- result
   return(WestResult)
 }
@@ -1022,7 +1042,6 @@ Seeds_Tournament = function(){
 }
 ST<-Seeds_Tournament()
 Final = function(ST){
-  
   Finalteam <- data.frame(matrix(ncol = 2))
   colnames(Finalteam) <- c("Team.A", "Team.B")
   Finalteam[,1] <- EastResult$Winner[7]
@@ -1062,35 +1081,34 @@ Simulation_Final = function(df, Probabilities){
 }
 #Finalgame<-Simulation_Final(Finalteam, ProbabilitiesCHI)
 Finalgame2 = function(){
-  return(Simulation_Final(Finalteam, ProbabilitiesVAN))
+  return(Simulation_Final(Finalteam, ProbabilitiesTSH))
   
 }
 
 NBAPLAYOFFS <- function() {
   # Combine all the functions to obtain results of the simulations
-  Seeds <- PlayInTournament(VAN_2024, playin2024, R = R)  
+  Seeds <- PlayInTournament(TSH_2024, playin2024, R = R)  
   Seedsofeast <- Seeds_East(Seeds)
   EastResult <- East()  
   Seedsofwest <- Seeds_West(Seeds)
   WestResult <- West()  
   ST <- Seeds_Tournament()
-  Finalteam <- Final(ST) 
+  Finalteam <- Final(ST)  
   Championship <- Finalgame2()  
   Output <- data.frame(EastResult)
   colnames(Output) <- c("Team.A", "Team.B", "Home_Win", "Winner", "TeamA_home_win_prob", "TeamA_away_win_prob")
   Output[8:14, ] <- WestResult  
   Output[15, ] <- Championship  
-  
   return(Output)  
 }
 
 NBA <- function() {
   # Combine all the functions to obtain results of the simulations
-  Seeds <- PlayInTournament(VAN_2024, playin2024, R = R)  
+  Seeds <- PlayInTournament(TSH_2024, playin2024, R = R)  
   Seedsofeast <- Seeds_East(Seeds)
-  EastResult <- East()  
+  EastResult <- East() 
   Seedsofwest <- Seeds_West(Seeds)
-  WestResult <- West() 
+  WestResult <- West()  
   ST <- Seeds_Tournament()
   Finalteam <- Final(ST)  
   Championship <- Finalgame2()  
